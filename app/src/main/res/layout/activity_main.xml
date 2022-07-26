@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:orientation="vertical"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <ImageView
+        android:layout_width="370sp"
+        android:layout_height="370sp"
+        android:layout_centerHorizontal="true"
+        android:id="@+id/result"
+        android:layout_marginTop="10sp"
+        android:src="@drawable/ic_launcher_background"
+        android:layout_weight="1"
+        android:layout_gravity="center"
+        />
+
+    <Button
+        android:id="@+id/get_img"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="image"/>
+
+
+</LinearLayout>
