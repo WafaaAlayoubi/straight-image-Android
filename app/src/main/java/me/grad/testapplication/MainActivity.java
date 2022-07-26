@@ -22,7 +22,9 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.calib3d.Calib3d;
 import org.opencv.core.CvException;
+import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.Size;
@@ -31,15 +33,19 @@ import org.opencv.imgproc.Imgproc;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
+
 import org.opencv.android.Utils;
+import org.opencv.utils.Converters;
 
 public class MainActivity extends AppCompatActivity {
 
     Button getImage;
     ImageView result;
     int imageSize = 32;
-
+    Mat ans ;
     BaseLoaderCallback mLoaderCallBack = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -101,57 +107,16 @@ public class MainActivity extends AppCompatActivity {
                     final InputStream imageStream = getContentResolver().openInputStream(imageUri);
                     final Bitmap selectedImage = BitmapFactory.decodeStream(imageStream);
 
-
-                    Point SEShedCornerDst = new Point(0.0,0.0);
-                    Point CloseForsythiaDst = new Point(800.0, 0.0);
-                    Point CornerHazelDst = new Point(0.0,800.0);
-                    Point FarForsythiaDst = new Point(800.0, 800.0);
-
-                    Point SEShedCornerSrc = new Point(75.0,207.0);
-                    Point CloseForsythiaSrc = new Point(663.0,180.0);
-                    Point CornerHazelSrc = new Point(90.0, 798.0);
-                    Point FarForsythiaSrc = new Point(690.0, 771.0);
-
-                    Point [] srcArray = new Point[4];
-                    srcArray[0] = SEShedCornerSrc;
-                    srcArray[1] = CloseForsythiaSrc;
-                    srcArray[2] = CornerHazelSrc;
-                    srcArray[3] = FarForsythiaSrc;
-
-                    Mat OutputMat = new Mat();
-                    LinkedList<Point> dstArray = new LinkedList<Point>();
-
-                    dstArray.add(SEShedCornerDst);
-                    dstArray.add(CloseForsythiaDst);
-                    dstArray.add(CornerHazelDst);
-                    dstArray.add(FarForsythiaDst);
-
-                    MatOfPoint2f dst = new MatOfPoint2f();
-                    dst.fromList(dstArray);
-
-                    MatOfPoint2f src = new MatOfPoint2f();
-                    src.fromArray(srcArray);
-
-                    Mat Homog;
-
-
-
-                    // obtain your homography mat (picked your parameters.. you have to play to get the right results)
-                    Mat homography = Calib3d.findHomography(src, dst, Calib3d.RANSAC, 3);
-// image you want to transform
-
                     Mat mat = new Mat();
                     Mat outputMat = new Mat();
                     Bitmap bmp32 = selectedImage.copy(Bitmap.Config.ARGB_8888, true);
                     Utils.bitmapToMat(bmp32, mat);
 
-// outputMat will contain the perspectively changed image
-                    Imgproc.warpPerspective(mat, outputMat, homography, new Size(800, 800));
+                    Mat outputMat2 = imageProc(mat);
                     Bitmap bmp = null;
                     try {
-                        //Imgproc.cvtColor(seedsImage, tmp, Imgproc.COLOR_RGB2BGRA);
-                        bmp = Bitmap.createBitmap(outputMat.cols(), outputMat.rows(), Bitmap.Config.ARGB_8888);
-                        Utils.matToBitmap(outputMat, bmp);
+                        bmp = Bitmap.createBitmap(outputMat2.cols(), outputMat2.rows(), Bitmap.Config.ARGB_8888);
+                        Utils.matToBitmap(outputMat2, bmp);
                     }
                     catch (CvException e){
                         Log.d("Exception",e.getMessage());}
@@ -166,5 +131,101 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    public Mat imageProc (Mat imgSource){
+        Mat sourceImage = imgSource;
+        ans = imgSource;
+        Imgproc.cvtColor(imgSource, imgSource, Imgproc.COLOR_BGR2GRAY);
+
+        //convert the image to black and white does (8 bit)
+        Imgproc.Canny(imgSource, imgSource, 50, 50);
+
+        //apply gaussian blur to smoothen lines of dots
+        Imgproc.GaussianBlur(imgSource, imgSource, new  org.opencv.core.Size(5, 5), 5);
+
+        //find the contours
+        List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
+        Imgproc.findContours(imgSource, contours, new Mat(), Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE);
+
+        double maxArea = -1;
+        int maxAreaIdx = -1;
+        Log.d("size",Integer.toString(contours.size()));
+        MatOfPoint temp_contour = contours.get(0); //the largest is at the index 0 for starting point
+        MatOfPoint2f approxCurve = new MatOfPoint2f();
+        MatOfPoint largest_contour = contours.get(0);
+        //largest_contour.ge
+        List<MatOfPoint> largest_contours = new ArrayList<MatOfPoint>();
+        //Imgproc.drawContours(imgSource,contours, -1, new Scalar(0, 255, 0), 1);
+
+        for (int idx = 0; idx < contours.size(); idx++) {
+            temp_contour = contours.get(idx);
+            double contourarea = Imgproc.contourArea(temp_contour);
+            //compare this contour to the previous largest contour found
+            if (contourarea > maxArea) {
+                //check if this contour is a square
+                MatOfPoint2f new_mat = new MatOfPoint2f( temp_contour.toArray() );
+                int contourSize = (int)temp_contour.total();
+                MatOfPoint2f approxCurve_temp = new MatOfPoint2f();
+                Imgproc.approxPolyDP(new_mat, approxCurve_temp, contourSize*0.05, true);
+                if (approxCurve_temp.total() == 4) {
+                    maxArea = contourarea;
+                    maxAreaIdx = idx;
+                    approxCurve=approxCurve_temp;
+                    largest_contour = temp_contour;
+                }
+            }
+        }
+
+        Imgproc.cvtColor(imgSource, imgSource, Imgproc.COLOR_BayerBG2RGB);
+
+        double[] temp_double;
+        temp_double = approxCurve.get(0,0);
+        Point p1 = new Point(temp_double[0], temp_double[1]);
+
+        temp_double = approxCurve.get(1,0);
+        Point p2 = new Point(temp_double[0], temp_double[1]);
+        temp_double = approxCurve.get(2,0);
+        Point p3 = new Point(temp_double[0], temp_double[1]);
+        temp_double = approxCurve.get(3,0);
+        Point p4 = new Point(temp_double[0], temp_double[1]);
+        List<Point> source = new ArrayList<Point>();
+        source.add(p1);
+        source.add(p2);
+        source.add(p3);
+        source.add(p4);
+        Mat startM = Converters.vector_Point2f_to_Mat(source);
+        Mat result=warp(sourceImage,startM);
+        return result;
+    }
+
+    public Mat warp(Mat inputMat,Mat startM) {
+        int resultWidth = 1000;
+        int resultHeight = 1000;
+
+        Mat outputMat = new Mat(resultWidth, resultHeight, CvType.CV_8UC4);
+
+
+
+        Point ocvPOut1 = new Point(0, 0);
+        Point ocvPOut2 = new Point(0, resultHeight);
+        Point ocvPOut3 = new Point(resultWidth, resultHeight);
+        Point ocvPOut4 = new Point(resultWidth, 0);
+        List<Point> dest = new ArrayList<Point>();
+        dest.add(ocvPOut1);
+        dest.add(ocvPOut2);
+        dest.add(ocvPOut3);
+        dest.add(ocvPOut4);
+        Mat endM = Converters.vector_Point2f_to_Mat(dest);
+
+        Mat perspectiveTransform = Imgproc.getPerspectiveTransform(startM, endM);
+
+        Imgproc.warpPerspective(inputMat,
+                outputMat,
+                perspectiveTransform,
+                new Size(resultWidth, resultHeight),
+                Imgproc.INTER_CUBIC);
+
+        return outputMat;
     }
 }
