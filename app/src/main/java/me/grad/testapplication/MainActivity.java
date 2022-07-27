@@ -45,7 +45,7 @@ public class MainActivity extends AppCompatActivity {
     Button getImage;
     ImageView result;
     int imageSize = 32;
-    Mat ans ;
+    Bitmap bmp32;
     BaseLoaderCallback mLoaderCallBack = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -108,11 +108,11 @@ public class MainActivity extends AppCompatActivity {
                     final Bitmap selectedImage = BitmapFactory.decodeStream(imageStream);
 
                     Mat mat = new Mat();
-                    Mat outputMat = new Mat();
-                    Bitmap bmp32 = selectedImage.copy(Bitmap.Config.ARGB_8888, true);
-                    Utils.bitmapToMat(bmp32, mat);
+                    bmp32 = selectedImage.copy(Bitmap.Config.ARGB_8888, true);
 
+                    Utils.bitmapToMat(selectedImage, mat);
                     Mat outputMat2 = imageProc(mat);
+
                     Bitmap bmp = null;
                     try {
                         bmp = Bitmap.createBitmap(outputMat2.cols(), outputMat2.rows(), Bitmap.Config.ARGB_8888);
@@ -135,7 +135,7 @@ public class MainActivity extends AppCompatActivity {
 
     public Mat imageProc (Mat imgSource){
         Mat sourceImage = imgSource;
-        ans = imgSource;
+
         Imgproc.cvtColor(imgSource, imgSource, Imgproc.COLOR_BGR2GRAY);
 
         //convert the image to black and white does (8 bit)
@@ -158,12 +158,12 @@ public class MainActivity extends AppCompatActivity {
         List<MatOfPoint> largest_contours = new ArrayList<MatOfPoint>();
         //Imgproc.drawContours(imgSource,contours, -1, new Scalar(0, 255, 0), 1);
 
-        for (int idx = 0; idx < contours.size(); idx++) {
-            temp_contour = contours.get(idx);
-            double contourarea = Imgproc.contourArea(temp_contour);
-            //compare this contour to the previous largest contour found
-            if (contourarea > maxArea) {
-                //check if this contour is a square
+            for (int idx = 0; idx < contours.size(); idx++) {
+                temp_contour = contours.get(idx);
+                double contourarea = Imgproc.contourArea(temp_contour);
+                //compare this contour to the previous largest contour found
+                if (contourarea > maxArea) {
+                    //check if this contour is a square
                 MatOfPoint2f new_mat = new MatOfPoint2f( temp_contour.toArray() );
                 int contourSize = (int)temp_contour.total();
                 MatOfPoint2f approxCurve_temp = new MatOfPoint2f();
@@ -220,7 +220,11 @@ public class MainActivity extends AppCompatActivity {
 
         Mat perspectiveTransform = Imgproc.getPerspectiveTransform(startM, endM);
 
-        Imgproc.warpPerspective(inputMat,
+
+        Mat mat = new Mat();
+        Utils.bitmapToMat(bmp32, mat);
+
+        Imgproc.warpPerspective(mat,
                 outputMat,
                 perspectiveTransform,
                 new Size(resultWidth, resultHeight),
